@@ -13,7 +13,7 @@ func generateVectors(vectorLength, numRows int) [][]int {
 	for i := 0; i < numRows; i++ {
 		vector := make([]int, vectorLength)
 		for j := 0; j < vectorLength; j++ {
-			vector[j] = rand.Intn(100) + 100 // Generate a random integer between 0 and 99
+			vector[j] = rand.Intn(100) +100 // Generate a random integer between 0 and 99
 		}
 		vectors[i] = vector
 	}
@@ -36,7 +36,7 @@ func printVectors(vectors [][]int) {
 
 func main() {
 	// Change these variables to generate different vector lengths and number of rows
-	vectorLength := 8 
+	vectorLength := 512
 	numRows := 100000
 
 	vectors := generateVectors(vectorLength, numRows)

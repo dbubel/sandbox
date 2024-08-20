@@ -3,7 +3,7 @@ const rand = std.crypto.random;
 const DIMS = 8; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
-const K: usize = 2; // number of clusters to build
+const K: usize = 10; // number of clusters to build
 const EPSILON: f32 = 0.1;
 const THREADS = 12;
 const vecOps = VectorOps(DIMS, f32);
@@ -33,7 +33,7 @@ pub fn main() !void {
 
     // ----------------------------------------------------------------- File read start
     var t = std.time.milliTimestamp();
-    const file = try std.fs.cwd().openFile("../data/8_100k.jsonl", .{});
+    const file = try std.fs.cwd().openFile("../data/8_200k.jsonl", .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();
