@@ -1,9 +1,9 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 8; // dimension of the vectors we are working with
+const DIMS = 512; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
-const K: usize = 10; // number of clusters to build
+const K: usize = 2; // number of clusters to build
 const EPSILON: f32 = 0.1;
 const THREADS = 12;
 const vecOps = VectorOps(DIMS, f32);
@@ -33,7 +33,7 @@ pub fn main() !void {
 
     // ----------------------------------------------------------------- File read start
     var t = std.time.milliTimestamp();
-    const file = try std.fs.cwd().openFile("../data/8_200k.jsonl", .{});
+    const file = try std.fs.cwd().openFile("../data/512_10k.jsonl", .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();
@@ -171,6 +171,12 @@ pub fn main() !void {
             c.clearRetainingCapacity();
         }
     }
+    // for (clusters.items) |item| {
+    //     for (item.items) |ele| {
+    //         // _=item;
+    //         std.debug.print("{any}\n", .{ele});
+    //     }
+    // }
     std.debug.print("total iterations {d}\n", .{total_iterations});
     std.debug.print("File read time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
@@ -209,8 +215,8 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn mag(v1: @Vector(N, T)) T {
-            return std.math.sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
-            // return Q_sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
+            // return std.math.sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
+            return Q_sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
         }
 
         pub fn cos_sim(v1: @Vector(N, T), v2: @Vector(N, T)) T {
@@ -248,6 +254,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
     };
 }
+
 test "vec mean" {
     const alloc = std.testing.allocator;
     const asdf = VectorOps(2, f32);
@@ -258,6 +265,18 @@ test "vec mean" {
     try arr.append(@Vector(2, f32){ 2, 2 });
     const mean = asdf.mean(arr);
     std.debug.print("mean: {d}\n", .{mean});
+}
+
+test "vec mean simd" {
+    // const alloc = std.testing.allocator;
+    // const asdf = VectorOps(2, f32);
+    // var arr = std.ArrayList(@Vector(2, f32)).init(alloc);
+    // defer arr.deinit();
+    const result: @Vector(2, f32) = @splat(2);
+
+    const v1 = @Vector(2, f32){ 1, 1 };
+    const v2 = @Vector(2, f32){ 2, 2 };
+    std.debug.print("add: {d}\n", .{(v1 + v2) / result});
 }
 const threehalfs: f32 = 1.5;
 pub fn Q_sqrt(number: f32) f32 {

@@ -15,12 +15,11 @@ import (
 
 const (
 	NUM_CLUSTERS = 2
-	EPSILON      = 0.01
+	EPSILON      = 0.1
 )
 
 type ThreadSafeClusters struct {
 	m        sync.Mutex
-	// Clusters sync.Map[[32]byte][][]floatfloat32
 	Clusters map[[32]byte][][]float32
 }
 
@@ -30,15 +29,15 @@ func NewClusters() *ThreadSafeClusters {
 	}
 }
 
-func (c *ThreadSafeClusters) appendAt(idx [32]byte, value []float32) {
-	c.m.Lock()
-	defer c.m.Unlock()
-	c.Clusters[idx] = append(c.Clusters[idx], value)
-}
+// func (c *ThreadSafeClusters) appendAt(idx [32]byte, value []float32) {
+// 	c.m.Lock()
+// 	defer c.m.Unlock()
+// 	c.Clusters[idx] = append(c.Clusters[idx], value)
+// }
 
 
 func main() {
-	file, err := os.Open("../../data/512_10k.jsonl")
+	file, err := os.Open("../../data/8_10.jsonl")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -93,7 +92,8 @@ func main() {
 				}
 
 				wg.Done()
-				clusters.appendAt(bestCentroid, vec)
+				clusters.Clusters[bestCentroid] = append(clusters.Clusters[bestCentroid], vec)
+				// clusters.appendAt(bestCentroid, vec)
 			}()
 		}
 		wg.Wait()
