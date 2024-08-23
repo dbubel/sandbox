@@ -29,15 +29,36 @@ func NewClusters() *ThreadSafeClusters {
 	}
 }
 
-// func (c *ThreadSafeClusters) appendAt(idx [32]byte, value []float32) {
-// 	c.m.Lock()
-// 	defer c.m.Unlock()
-// 	c.Clusters[idx] = append(c.Clusters[idx], value)
+// Append a vector to a specific cluster
+func (tc *ThreadSafeClusters) AppendToCluster(key [32]byte, vec []float32) {
+	tc.m.Lock()
+	defer tc.m.Unlock()
+	tc.Clusters[key] = append(tc.Clusters[key], vec)
+}
+
+// Retrieve a copy of the cluster's data
+// func (tc *ThreadSafeClusters) GetCluster(key [32]byte) ([][]float32, bool) {
+// 	tc.m.Lock()
+// 	defer tc.m.Unlock()
+// 	cluster, exists := tc.Clusters[key]
+// 	if !exists {
+// 		return nil, false
+// 	}
+// 	// Return a copy of the cluster to avoid race conditions
+// 	clusterCopy := make([][]float32, len(cluster))
+// 	copy(clusterCopy, cluster)
+// 	return clusterCopy, true
 // }
 
+// Clear all clusters
+func (tc *ThreadSafeClusters) ClearClusters() {
+	tc.m.Lock()
+	defer tc.m.Unlock()
+	tc.Clusters = make(map[[32]byte][][]float32)
+}
 
 func main() {
-	file, err := os.Open("../../data/8_10.jsonl")
+	file, err := os.Open("../../data/1024_10k.jsonl")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -68,7 +89,7 @@ func main() {
 	guesses = make(map[int]struct{})
 
 	for len(guesses) < NUM_CLUSTERS {
-		guess := rand.Intn(NUM_CLUSTERS + 1)
+		guess := rand.Intn(len(vecData))
 		if _, exists := guesses[guess]; !exists {
 			guesses[guess] = struct{}{}
 			centroids = append(centroids, vecData[guess])
@@ -80,7 +101,8 @@ func main() {
 	for {
 		for _, vec := range vecData {
 			wg.Add(1)
-			go func() {
+			go func(vec []float32) {
+				defer wg.Done()
 				minDist := math.Inf(1)
 				var bestCentroid [32]byte
 				for _, centroid := range centroids {
@@ -90,18 +112,15 @@ func main() {
 						minDist = float64(dist)
 					}
 				}
-
-				wg.Done()
-				clusters.Clusters[bestCentroid] = append(clusters.Clusters[bestCentroid], vec)
-				// clusters.appendAt(bestCentroid, vec)
-			}()
+				clusters.AppendToCluster(bestCentroid, vec)
+			}(vec)
 		}
 		wg.Wait()
 
 		converged := true
 		for i := range centroids {
 			clust, exists := clusters.Clusters[HashFloat32Slice(centroids[i])]
-			if !exists { // this sould never ever happen
+			if !exists { // this should never happen
 				continue
 			}
 
@@ -117,12 +136,10 @@ func main() {
 			break
 		}
 
-		// we are doing another round so zero out clusters
-		for key := range clusters.Clusters {
-			delete(clusters.Clusters, key)
-		}
+		// we are doing another round so clear out clusters
+		clusters.ClearClusters()
 	}
-	//
+
 	// for k, v := range clusters.Clusters {
 	// 	fmt.Println("\t", k)
 	// 	for _, i := range v {
@@ -185,3 +202,4 @@ func HashFloat32Slice(data []float32) [32]byte {
 	// Compute the final hash
 	return sha256.Sum256(hasher.Sum(nil))
 }
+

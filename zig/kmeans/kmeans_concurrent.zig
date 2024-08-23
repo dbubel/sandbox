@@ -1,6 +1,6 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 512; // dimension of the vectors we are working with
+const DIMS = 1024; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
 const K: usize = 2; // number of clusters to build
@@ -23,7 +23,7 @@ pub fn main() !void {
     try thread_pool.init(.{ .allocator = allocator, .n_jobs = cpuCount });
     defer thread_pool.deinit();
 
-    var buf: [1024 * 10]u8 = undefined;
+    var buf: [1024 * 1024]u8 = undefined;
     var writer = std.io.fixedBufferStream(&buf);
 
     var centroids = std.ArrayList(@Vector(DIMS, f32)).init(allocator);
@@ -33,7 +33,7 @@ pub fn main() !void {
 
     // ----------------------------------------------------------------- File read start
     var t = std.time.milliTimestamp();
-    const file = try std.fs.cwd().openFile("../data/512_10k.jsonl", .{});
+    const file = try std.fs.cwd().openFile("../../data/1024_10k.jsonl", .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();

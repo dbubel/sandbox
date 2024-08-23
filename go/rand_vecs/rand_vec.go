@@ -36,8 +36,8 @@ func printVectors(vectors [][]int) {
 
 func main() {
 	// Change these variables to generate different vector lengths and number of rows
-	vectorLength := 512
-	numRows := 1000000
+	vectorLength := 1024 
+	numRows := 679123
 
 	vectors := generateVectors(vectorLength, numRows)
 	printVectors(vectors)

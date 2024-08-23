@@ -20,7 +20,7 @@ def perform_kmeans_clustering(vectors, num_clusters):
 
 
 def main():
-    input_file = '../data/512_10k.jsonl'  # Path to your JSON Lines file
+    input_file = '../data/1024_10k.jsonl'  # Path to your JSON Lines file
     num_clusters = 2 # Number of clusters to form
 
     start_time = time.time()
