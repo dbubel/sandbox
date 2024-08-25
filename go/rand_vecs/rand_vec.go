@@ -1,19 +1,20 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"time"
 )
 
 // generateVectors generates a slice of vectors with specified length and number of rows
-func generateVectors(vectorLength, numRows int) [][]int {
+func generateVectors(vectorLength, numRows, offset int) [][]int {
 	rand.Seed(time.Now().UnixNano())
 	vectors := make([][]int, numRows)
 	for i := 0; i < numRows; i++ {
 		vector := make([]int, vectorLength)
 		for j := 0; j < vectorLength; j++ {
-			vector[j] = rand.Intn(100000) // Generate a random integer between 0 and 99
+			vector[j] = rand.Intn(10) + offset
 		}
 		vectors[i] = vector
 	}
@@ -35,10 +36,12 @@ func printVectors(vectors [][]int) {
 }
 
 func main() {
-	// Change these variables to generate different vector lengths and number of rows
-	vectorLength := 1024 
-	numRows := 679123
+	vectorLength := flag.Int("vectorLength", 1024, "Length of each vector")
+	numRows := flag.Int("numRows", 679123, "Number of rows (vectors)")
+	offset := flag.Int("offset", 0, "Offset for random numbers")
 
-	vectors := generateVectors(vectorLength, numRows)
+	flag.Parse()
+
+	vectors := generateVectors(*vectorLength, *numRows, *offset)
 	printVectors(vectors)
 }

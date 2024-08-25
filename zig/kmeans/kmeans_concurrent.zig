@@ -1,9 +1,9 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 1024; // dimension of the vectors we are working with
+const DIMS = 2; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
-const K: usize = 2; // number of clusters to build
+const K: usize = 4; // number of clusters to build
 const EPSILON: f32 = 0.1;
 const THREADS = 12;
 const vecOps = VectorOps(DIMS, f32);
@@ -33,7 +33,7 @@ pub fn main() !void {
 
     // ----------------------------------------------------------------- File read start
     var t = std.time.milliTimestamp();
-    const file = try std.fs.cwd().openFile("../../data/1024_10k.jsonl", .{});
+    const file = try std.fs.cwd().openFile("../../data/2_rand_100.jsonl", .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();
@@ -101,7 +101,7 @@ pub fn main() !void {
     // for (0..K, centroids.items) |_, centroid| {
     //     try clusters.append(Cluster.init(allocator, centroid));
     // }
-    std.debug.print("chunk size {d}\n", .{inc});
+    // std.debug.print("chunk size {d}\n", .{inc});
 
     // t = std.time.milliTimestamp();
     // while (true) {
@@ -160,7 +160,7 @@ pub fn main() !void {
         }
         // std.debug.print("move centroids time: {d}\n", .{std.time.milliTimestamp() - t});
         if (!moved) {
-            std.debug.print("done\n", .{});
+            // std.debug.print("done\n", .{});
             break;
         }
         for (clusters.items) |*c| {
@@ -171,16 +171,26 @@ pub fn main() !void {
             c.clearRetainingCapacity();
         }
     }
-    // for (clusters.items) |item| {
-    //     for (item.items) |ele| {
-    //         // _=item;
-    //         std.debug.print("{any}\n", .{ele});
-    //     }
-    // }
+    for (centroids.items) |centroid| {
+        std.debug.print("{any}\n", .{centroid});
+    }
+    for (clusters.items) |item| {
+        for (item.items) |ele| {
+            try marshal(ele);
+        }
+    }
     std.debug.print("total iterations {d}\n", .{total_iterations});
     std.debug.print("File read time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
+const Point = struct { data: []const u8 };
 
+fn marshal(T: anytype) !void {
+    const out = std.io.getStdOut().writer();
+    try std.json.stringify(T, .{}, out);
+    _ = out.write("\n") catch |err| {
+        std.debug.print("{any}", .{err});
+    };
+}
 fn calulateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.ArrayList(VType), classifiedVecs: *std.ArrayList(Vector)) void {
     defer wg.finish();
 

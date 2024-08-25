@@ -1,5 +1,6 @@
 const std = @import("std");
 const kmeans = @import("kmeans.zig");
+const kmeans_concurrent = @import("kmeans_concurrent.zig.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
