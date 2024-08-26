@@ -1,10 +1,10 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 2; // dimension of the vectors we are working with
+const DIMS = 512; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
-const K: usize = 4; // number of clusters to build
-const EPSILON: f32 = 0.1;
+// const K: usize = 4; // number of clusters to build
+const EPSILON: f32 = 0.01;
 const THREADS = 12;
 const vecOps = VectorOps(DIMS, f32);
 
@@ -14,7 +14,7 @@ const Vector = struct {
     cluster_id: usize,
 };
 
-pub fn main() !void {
+pub fn run(K: usize, file_name: []const u8) !void {
     var wg = std.Thread.WaitGroup{};
     const cpuCount = try std.Thread.getCpuCount();
     const allocator = std.heap.c_allocator;
@@ -29,11 +29,11 @@ pub fn main() !void {
     var centroids = std.ArrayList(@Vector(DIMS, f32)).init(allocator);
     defer centroids.deinit();
 
-    var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 1000000);
+    var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 1100000);
 
     // ----------------------------------------------------------------- File read start
     var t = std.time.milliTimestamp();
-    const file = try std.fs.cwd().openFile("../../data/2_rand_100.jsonl", .{});
+    const file = try std.fs.cwd().openFile(file_name, .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();
@@ -108,18 +108,18 @@ pub fn main() !void {
     var clusters = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..THREADS) |_| {
         var a = std.ArrayList(Vector).init(allocator);
-        try a.ensureTotalCapacity(1000000);
+        try a.ensureTotalCapacity(150000);
         try clusters.append(a);
     }
     var cluster_sum = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..K) |_| {
         var a = std.ArrayList(Vector).init(allocator);
-        try a.ensureTotalCapacity(1000000);
+        try a.ensureTotalCapacity(150000);
         try cluster_sum.append(a);
     }
 
-    t = std.time.milliTimestamp();
     var total_iterations: usize = 0;
+    t = std.time.milliTimestamp();
     while (true) {
         total_iterations += 1;
         var i: usize = 0;
@@ -171,16 +171,16 @@ pub fn main() !void {
             c.clearRetainingCapacity();
         }
     }
-    for (centroids.items) |centroid| {
-        std.debug.print("{any}\n", .{centroid});
-    }
-    for (clusters.items) |item| {
-        for (item.items) |ele| {
-            try marshal(ele);
-        }
-    }
+    // for (centroids.items) |centroid| {
+    //     std.debug.print("{any}\n", .{centroid});
+    // }
+    // for (clusters.items) |item| {
+    //     for (item.items) |ele| {
+    //         try marshal(ele);
+    //     }
+    // }
     std.debug.print("total iterations {d}\n", .{total_iterations});
-    std.debug.print("File read time: {d}ms\n", .{std.time.milliTimestamp() - t});
+    std.debug.print("kmeans time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
 const Point = struct { data: []const u8 };
 

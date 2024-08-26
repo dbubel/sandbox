@@ -1,17 +1,23 @@
 const std = @import("std");
-const kmeans = @import("kmeans.zig");
-const kmeans_concurrent = @import("kmeans_concurrent.zig.zig");
+const kmeans = @import("kmeans_pool.zig");
+const kmeans_concurrent = @import("kmeans_concurrent.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
-    var args = try std.process.ArgIterator.initWithAllocator(allocator);
+    const args = try std.process.argsAlloc(allocator);
 
-    // const stdout = std.io.getStdOut().writer();
-    var asdf: []const u8 = undefined;
-    while (args.next()) |arg| {
-        // try stdout.print("{s}\n", .{arg});
-        asdf = arg;
+    const file = args[1];
+    const number_str = args[2];
+    const program = args[3];
+    const number = try std.fmt.parseInt(usize, number_str, 10);
+
+    std.debug.print("{d} {s}", .{ number, file });
+    if (std.mem.eql(u8, program, "chunked")) {
+        try kmeans_concurrent.run(number, file);
+        return;
     }
-    const x = try std.fmt.parseInt(usize, asdf, 10);
-    try kmeans.run(x);
+    if (std.mem.eql(u8, program, "pooled")) {
+        try kmeans.run(number, file);
+        return;
+    }
 }

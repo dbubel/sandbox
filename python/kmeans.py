@@ -13,15 +13,15 @@ def load_vectors_from_jsonl(file_path):
     return np.array(vectors)
 
 
-def perform_kmeans_clustering(vectors, num_clusters):
-    kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+def perform_kmeans_clustering(vectors, num_clusters, epsilon=1e-1):
+    kmeans = KMeans(n_clusters=num_clusters, random_state=42, tol=epsilon)
     kmeans.fit(vectors)
     return kmeans.labels_, kmeans.cluster_centers_
 
 
 def main():
-    input_file = '../data/512_50k.jsonl'  # Path to your JSON Lines file
-    num_clusters = 10 # Number of clusters to form
+    input_file = '../data/8_f32_rand_1m.jsonl'  # Path to your JSON Lines file
+    num_clusters = 10  # Number of clusters to form
 
     start_time = time.time()
     vectors = load_vectors_from_jsonl(input_file)
@@ -32,9 +32,8 @@ def main():
     start_time = time.time()
     labels, cluster_centers = perform_kmeans_clustering(vectors, num_clusters)
     end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"\ncluster time: {elapsed_time:.4f} seconds")
-
+    elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
+    print(f"\ncluster time: {elapsed_time:.4f} ms")
     print("Cluster Labels for Each Vector:")
     print(labels)
     print("\nCluster Centers:")

@@ -4,13 +4,13 @@ const print = std.debug.print;
 
 const DIMS = 512; // dimension of the vectors we are working with
 const vecOps = VectorOps(DIMS, f32);
-pub fn run(arg: usize) !void {
+pub fn run(K: usize, file_name: []const u8) !void {
     // var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};
     // defer _ = gpa.deinit();
     // var gpa_allocator = gpa.allocator();
     // var arena = std.heap.ArenaAllocator.init(gpa.allocator());
     // _ = arena;
-    const file = try std.fs.cwd().openFile("../../data/512_100k.jsonl", .{});
+    const file = try std.fs.cwd().openFile(file_name, .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();
@@ -24,12 +24,12 @@ pub fn run(arg: usize) !void {
 
     // precision to use to determine if the centroids moved
     const epsilon: f32 = 0.01;
-    const K: usize = arg; // number of clusters to build
+    // const K: usize = arg; // number of clusters to build
 
     // kmeans_groups is the final data structure that holds the mapping of
     // centroids to elements.
-    var kmeans_groups = LinkedList(@Vector(DIMS, f32)).init(&allocator);
-    defer kmeans_groups.removeAll();
+    // var kmeans_groups = LinkedList(@Vector(DIMS, f32)).init(&allocator);
+    // defer kmeans_groups.removeAll();
 
     // clusters is a list of lists for holding centroids -> members of the group
     var clusters = TSA(TSA(@Vector(DIMS, f32))).init(&allocator);
@@ -47,12 +47,12 @@ pub fn run(arg: usize) !void {
 
     // buffer and wrapped stream for reading in the vectors from a file
     // var buf = std.ArrayList(u8).init(allocator);
-    var buf: [1024 * 10]u8 = undefined;
+    var buf: [1024 * 1024]u8 = undefined;
     var writer = std.io.fixedBufferStream(&buf);
 
     // vector data from file
     var vecData = TSA(@Vector(DIMS, f32)).init(&allocator);
-    try vecData.list.ensureTotalCapacity(20000);
+    try vecData.list.ensureTotalCapacity(1000000);
     defer vecData.deinit();
 
     var start = std.time.milliTimestamp();
@@ -102,13 +102,12 @@ pub fn run(arg: usize) !void {
     // Initialize the arraylists that will contain the vectors for each centroid
     for (0..K) |_| {
         var arr = TSA(@Vector(DIMS, f32)).init(&allocator);
-        try arr.list.ensureTotalCapacity(20000);
+        try arr.list.ensureTotalCapacity(1000000);
         try clusters.append(arr);
     }
 
-    start = std.time.milliTimestamp();
-
     var wg = std.Thread.WaitGroup{};
+    start = std.time.milliTimestamp();
     while (true) {
         // loop to classify each vector into a cluster
         for (vecData.list.items) |vec| {
@@ -131,10 +130,10 @@ pub fn run(arg: usize) !void {
         // if we did not move, then we have good enough centroids
         // we are done
         if (!moved) {
-            for (centroids.list.items, clusters.list.items) |centroid, clusters_items| {
-                _ = centroid;
-                std.debug.print("Centroid len {d}\n", .{clusters_items.list.items.len});
-            }
+            // for (centroids.list.items, clusters.list.items) |centroid, clusters_items| {
+            // _ = centroid;
+            // std.debug.print("Centroid len {d}\n", .{clusters_items.list.items.len});
+            // }
             break;
         }
 
@@ -167,58 +166,58 @@ fn assignCentroid(wg: *std.Thread.WaitGroup, centroids: TSA(@Vector(DIMS, f32)),
     };
 }
 
-pub fn LinkedList(comptime T: type) type {
-    return struct {
-        const This = @This();
-        const Node = struct {
-            centroid: T,
-            members: TSA(T),
-            next: ?*Node,
-        };
-
-        allocator: *std.mem.Allocator,
-        head: ?*Node,
-        len: usize,
-
-        pub fn init(allocator: *std.mem.Allocator) This {
-            return .{
-                .allocator = allocator,
-                .head = null,
-                .len = 0,
-            };
-        }
-
-        pub fn append(self: *This, centroid: T, members: TSA(T)) !void {
-            const new_node: *Node = try self.allocator.create(Node);
-            new_node.* = Node{ .centroid = centroid, .members = members, .next = self.head };
-            self.head = new_node;
-            self.len += 1;
-        }
-
-        pub fn removeAll(self: *This) void {
-            var current_node: ?*Node = self.head;
-            while (current_node) |node| {
-                current_node = node.next;
-
-                node.members.deinit();
-                self.allocator.destroy(node);
-            }
-            self.head = null;
-            self.len = 0;
-        }
-
-        pub fn print(self: *This) void {
-            var current_node = self.head;
-            while (current_node) |node| {
-                std.debug.print("centroid {any}\n", .{node.centroid});
-                for (node.members.list.items) |member| {
-                    std.debug.print("\tmember {any}\n", .{member});
-                }
-                current_node = node.next;
-            }
-        }
-    };
-}
+// pub fn LinkedList(comptime T: type) type {
+//     return struct {
+//         const This = @This();
+//         const Node = struct {
+//             centroid: T,
+//             members: TSA(T),
+//             next: ?*Node,
+//         };
+//
+//         allocator: *std.mem.Allocator,
+//         head: ?*Node,
+//         len: usize,
+//
+//         pub fn init(allocator: *std.mem.Allocator) This {
+//             return .{
+//                 .allocator = allocator,
+//                 .head = null,
+//                 .len = 0,
+//             };
+//         }
+//
+//         pub fn append(self: *This, centroid: T, members: TSA(T)) !void {
+//             const new_node: *Node = try self.allocator.create(Node);
+//             new_node.* = Node{ .centroid = centroid, .members = members, .next = self.head };
+//             self.head = new_node;
+//             self.len += 1;
+//         }
+//
+//         pub fn removeAll(self: *This) void {
+//             var current_node: ?*Node = self.head;
+//             while (current_node) |node| {
+//                 current_node = node.next;
+//
+//                 node.members.deinit();
+//                 self.allocator.destroy(node);
+//             }
+//             self.head = null;
+//             self.len = 0;
+//         }
+//
+//         pub fn print(self: *This) void {
+//             var current_node = self.head;
+//             while (current_node) |node| {
+//                 std.debug.print("centroid {any}\n", .{node.centroid});
+//                 for (node.members.list.items) |member| {
+//                     std.debug.print("\tmember {any}\n", .{member});
+//                 }
+//                 current_node = node.next;
+//             }
+//         }
+//     };
+// }
 // fn asdf(centroids: std.ArrayList(@Vector(512, f32))) void {
 //             var clusterIndex: usize = 0; // the index of the cluster we assign the vector to
 //             var minDist: f32 = std.math.inf(f32);

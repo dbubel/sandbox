@@ -29,7 +29,7 @@ func printVectors(vectors [][]int) {
 			if i > 0 {
 				fmt.Printf(",")
 			}
-			fmt.Printf("%d", val)
+			fmt.Printf("%f.2", val)
 		}
 		fmt.Printf("]\n")
 	}

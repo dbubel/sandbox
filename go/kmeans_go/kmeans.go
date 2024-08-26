@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	NUM_CLUSTERS = 2
-	EPSILON      = 0.1
+	NUM_CLUSTERS = 10
+	EPSILON      = 0.01
 )
 
 type ThreadSafeClusters struct {
@@ -58,7 +58,7 @@ func (tc *ThreadSafeClusters) ClearClusters() {
 }
 
 func main() {
-	file, err := os.Open("../../data/1024_10k.jsonl")
+	file, err := os.Open("../../data/8_f32_rand_1m.jsonl")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -202,4 +202,3 @@ func HashFloat32Slice(data []float32) [32]byte {
 	// Compute the final hash
 	return sha256.Sum256(hasher.Sum(nil))
 }
-
