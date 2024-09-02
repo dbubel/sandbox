@@ -2,7 +2,7 @@ const std = @import("std");
 const rand = std.crypto.random;
 const print = std.debug.print;
 
-const DIMS = 512; // dimension of the vectors we are working with
+const DIMS = 8; // dimension of the vectors we are working with
 const vecOps = VectorOps(DIMS, f32);
 pub fn run(K: usize, file_name: []const u8) !void {
     // var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){};

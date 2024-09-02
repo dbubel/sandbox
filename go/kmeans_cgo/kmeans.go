@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	NUM_CLUSTERS = 2
+	NUM_CLUSTERS = 10
 	EPSILON      = 0.01
 )
 

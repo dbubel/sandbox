@@ -1,9 +1,8 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 512; // dimension of the vectors we are working with
+const DIMS = 2; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
-// const K: usize = 4; // number of clusters to build
 const EPSILON: f32 = 0.01;
 const THREADS = 12;
 const vecOps = VectorOps(DIMS, f32);
@@ -15,7 +14,6 @@ const Vector = struct {
 };
 
 pub fn run(K: usize, file_name: []const u8) !void {
-    var wg = std.Thread.WaitGroup{};
     const cpuCount = try std.Thread.getCpuCount();
     const allocator = std.heap.c_allocator;
 
@@ -23,53 +21,37 @@ pub fn run(K: usize, file_name: []const u8) !void {
     try thread_pool.init(.{ .allocator = allocator, .n_jobs = cpuCount });
     defer thread_pool.deinit();
 
-    var buf: [1024 * 1024]u8 = undefined;
-    var writer = std.io.fixedBufferStream(&buf);
-
     var centroids = std.ArrayList(@Vector(DIMS, f32)).init(allocator);
     defer centroids.deinit();
 
     var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 1100000);
 
     // ----------------------------------------------------------------- File read start
-    var t = std.time.milliTimestamp();
+    var buf: [1024 * 256]u8 = undefined;
+    var writer = std.io.fixedBufferStream(&buf);
     const file = try std.fs.cwd().openFile(file_name, .{});
     var buffered = std.io.bufferedReader(file.reader());
     var reader = buffered.reader();
     defer file.close();
-
     var numVecs: usize = 0;
+
+    var t = std.time.milliTimestamp();
     while (true) {
         defer writer.reset();
         // read the file line by line writing into buf
         reader.streamUntilDelimiter(writer.writer(), '\n', null) catch |err| {
-            switch (err) {
-                error.EndOfStream => {
-                    break;
-                },
-                else => {
-                    std.debug.print("{any}", .{err});
-                    break;
-                },
-            }
+            std.debug.print("error: {any}\n", .{err});
+            break;
         };
 
         // parse the json array as a fixed size f32 array
         const arr = std.json.parseFromSlice([DIMS]f32, allocator, buf[0..writer.pos], .{}) catch |err| {
-            switch (err) {
-                error.UnexpectedEndOfInput => {
-                    break;
-                },
-                else => {
-                    std.debug.print("{any} error reading json\n", .{err});
-                    break;
-                },
-            }
+            std.debug.print("error: {any}\n", .{err});
+            break;
         };
 
         vecData[numVecs] = arr.value;
         numVecs += 1;
-        // try vecData.append(arr.value);
         defer arr.deinit();
     }
     std.debug.print("File read time: {d}ms\n", .{std.time.milliTimestamp() - t});
@@ -92,25 +74,15 @@ pub fn run(K: usize, file_name: []const u8) !void {
         try centroids.append(vecData[d]);
         goodClusters += 1;
     }
-    // for (centroids.items) |centroid| {
-    //     std.debug.print("Centroid {d}\n", .{centroid});
-    // }
 
     const inc: usize = (numVecs + cpuCount) / cpuCount;
-    // var clusters = std.ArrayList(Cluster).init(allocator);
-    // for (0..K, centroids.items) |_, centroid| {
-    //     try clusters.append(Cluster.init(allocator, centroid));
-    // }
-    // std.debug.print("chunk size {d}\n", .{inc});
-
-    // t = std.time.milliTimestamp();
-    // while (true) {
     var clusters = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..THREADS) |_| {
         var a = std.ArrayList(Vector).init(allocator);
         try a.ensureTotalCapacity(150000);
         try clusters.append(a);
     }
+
     var cluster_sum = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..K) |_| {
         var a = std.ArrayList(Vector).init(allocator);
@@ -120,11 +92,11 @@ pub fn run(K: usize, file_name: []const u8) !void {
 
     var total_iterations: usize = 0;
     t = std.time.milliTimestamp();
+    var wg = std.Thread.WaitGroup{};
     while (true) {
         total_iterations += 1;
         var i: usize = 0;
         var loop_num: usize = 0;
-        // t = std.time.milliTimestamp();
         while (i < numVecs) : (i += inc) {
             defer loop_num += 1;
             const end = if (i + inc < numVecs) i + inc else numVecs;
@@ -135,34 +107,25 @@ pub fn run(K: usize, file_name: []const u8) !void {
 
         thread_pool.waitAndWork(&wg);
         wg.reset();
-        // std.debug.print("thread time: {d}\n", .{std.time.milliTimestamp() - t});
+
         for (clusters.items) |item| {
             for (item.items) |v| {
                 try cluster_sum.items[v.cluster_id].append(v);
-                // std.debug.print("{d}", .{v.cluster_id});
             }
         }
         var moved: bool = false;
-        // t = std.time.milliTimestamp();
         for (cluster_sum.items, centroids.items) |sum, *centroid| {
-            // _ = centroid;
             const new_centroid = vecOps.meanV(sum);
             const dist = vecOps.dist(centroid.*, new_centroid);
             if (dist > EPSILON) {
                 moved = true;
             }
-            // for (sum.items) |s| {
-            //     std.debug.print("{any}\n", .{s});
-            // }
-            // std.debug.print("dist: {d} new_centroid {d} old_centroid {d}\n\n", .{ dist, new_centroid, centroid.* });
-
             centroid.* = new_centroid;
         }
-        // std.debug.print("move centroids time: {d}\n", .{std.time.milliTimestamp() - t});
         if (!moved) {
-            // std.debug.print("done\n", .{});
             break;
         }
+
         for (clusters.items) |*c| {
             c.clearRetainingCapacity();
         }
@@ -171,14 +134,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
             c.clearRetainingCapacity();
         }
     }
-    // for (centroids.items) |centroid| {
-    //     std.debug.print("{any}\n", .{centroid});
-    // }
-    // for (clusters.items) |item| {
-    //     for (item.items) |ele| {
-    //         try marshal(ele);
-    //     }
-    // }
+
     std.debug.print("total iterations {d}\n", .{total_iterations});
     std.debug.print("kmeans time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
@@ -191,6 +147,7 @@ fn marshal(T: anytype) !void {
         std.debug.print("{any}", .{err});
     };
 }
+
 fn calulateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.ArrayList(VType), classifiedVecs: *std.ArrayList(Vector)) void {
     defer wg.finish();
 
@@ -210,14 +167,13 @@ fn calulateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.A
         classifiedVecs.append(v) catch |err| {
             std.debug.print("err {any}\n", .{err});
         };
-        // std.debug.print("vec: {d} centroid: {d} dist: {d}\n", .{ vec, bestCentroid, minDist });
     }
 }
 
 pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
     return struct {
         pub fn dot(v1: @Vector(N, T), v2: @Vector(N, T)) T {
-            return @as(T, @floatCast(@reduce(.Add, v1 * v2)));
+            return @as(T, @reduce(.Add, v1 * v2));
         }
 
         pub fn dist(v1: @Vector(N, T), v2: @Vector(N, T)) T {
@@ -226,7 +182,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
 
         pub fn mag(v1: @Vector(N, T)) T {
             // return std.math.sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
-            return Q_sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
+            return Q_sqrt(@as(T, @reduce(.Add, v1 * v1)));
         }
 
         pub fn cos_sim(v1: @Vector(N, T), v2: @Vector(N, T)) T {
@@ -242,9 +198,11 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
             const result: @Vector(N, T) = @splat(@floatFromInt(group.items.len));
             return n / result;
         }
+
         pub fn distSquared(v1: @Vector(N, T), v2: @Vector(N, T)) T {
-            return @as(T, @floatCast(@reduce(.Add, (v2 - v1) * (v2 - v1))));
+            return @as(T, @reduce(.Add, (v2 - v1) * (v2 - v1)));
         }
+
         pub fn meanV(group: std.ArrayList(Vector)) @Vector(N, T) {
             var n: @Vector(N, T) = undefined;
             for (group.items) |point| {
@@ -254,6 +212,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
             const result: @Vector(N, T) = @splat(@floatFromInt(group.items.len));
             return n / result;
         }
+
         pub fn equal(v1: @Vector(N, T), v2: @Vector(N, T)) bool {
             for (0..N) |i| {
                 if (v1[i] != v2[i]) {

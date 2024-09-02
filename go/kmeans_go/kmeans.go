@@ -58,7 +58,7 @@ func (tc *ThreadSafeClusters) ClearClusters() {
 }
 
 func main() {
-	file, err := os.Open("../../data/8_f32_rand_1m.jsonl")
+	file, err := os.Open("../../data/8_f32_rand_10k.jsonl")
 	if err != nil {
 		fmt.Println(err.Error())
 		return
