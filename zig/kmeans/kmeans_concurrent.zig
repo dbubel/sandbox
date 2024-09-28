@@ -1,6 +1,6 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 2; // dimension of the vectors we are working with
+const DIMS = 512; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
 const EPSILON: f32 = 0.01;
@@ -113,25 +113,29 @@ pub fn run(K: usize, file_name: []const u8) !void {
                 try cluster_sum.items[v.cluster_id].append(v);
             }
         }
+        // var moved: bool = false;
+        // for (cluster_sum.items, centroids.items) |sum, *centroid| {
+        //     const new_centroid = vecOps.meanV(sum);
+        //     const dist = vecOps.dist(centroid.*, new_centroid);
+        //     if (dist > EPSILON) {
+        //         moved = true;
+        //     }
+        //     centroid.* = new_centroid;
+        // }
         var moved: bool = false;
-        for (cluster_sum.items, centroids.items) |sum, *centroid| {
-            const new_centroid = vecOps.meanV(sum);
-            const dist = vecOps.dist(centroid.*, new_centroid);
-            if (dist > EPSILON) {
-                moved = true;
-            }
-            centroid.* = new_centroid;
-        }
+        updateCentroids(&moved, centroids, cluster_sum);
         if (!moved) {
             break;
         }
 
         for (clusters.items) |*c| {
-            c.clearRetainingCapacity();
+            // c.clearRetainingCapacity();
+            c.resize(0) catch unreachable;
         }
 
         for (cluster_sum.items) |*c| {
-            c.clearRetainingCapacity();
+            c.resize(0) catch unreachable;
+            // c.clearRetainingCapacity();
         }
     }
 
@@ -140,6 +144,27 @@ pub fn run(K: usize, file_name: []const u8) !void {
 }
 const Point = struct { data: []const u8 };
 
+fn updateCentroids(moved: *bool, centroids: []VType, cluster_sum: std.ArrayList(std.ArrayList(Vector))) void {
+    var wg = std.Thread.WaitGroup{};
+
+    for (cluster_sum.items, 0..) |cluster, i| {
+        wg.start();
+        std.Thread.spawn(.{}, calcCentroidAndUpdate, .{ &wg, centroids, cluster, i, moved });
+    }
+
+    std.Thread.wait(&wg);
+}
+
+fn calcCentroidAndUpdate(wg: *std.Thread.WaitGroup, centroids: []VType, cluster: std.ArrayList(Vector), i: usize, moved: *bool) void {
+    defer wg.finish();
+
+    const new_centroid = vecOps.meanV(cluster);
+    const dist = vecOps.dist(centroids[i], new_centroid);
+    if (dist > EPSILON) {
+        moved.* = true;
+    }
+    centroids[i] = new_centroid;
+}
 fn marshal(T: anytype) !void {
     const out = std.io.getStdOut().writer();
     try std.json.stringify(T, .{}, out);

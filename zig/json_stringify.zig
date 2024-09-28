@@ -6,7 +6,7 @@ fn marshal(T: anytype) !void {
     try jsonStringify(T, .{}, out);
 }
 
-test "marshal" {
+pub fn main() !void {
     const data = .{
         .name = "Ziguana",
         .id = 1234,
