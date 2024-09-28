@@ -1,11 +1,10 @@
 const std = @import("std");
-const rand = std.crypto.random;
 const DIMS = 2; // dimension of the vectors we are working with
-const VType = @Vector(DIMS, f32);
-
 const EPSILON: f32 = 0.01;
 const THREADS = 12;
+
 const vecOps = VectorOps(DIMS, f32);
+const VType = @Vector(DIMS, f32);
 
 const Vector = struct {
     vec: VType,
@@ -60,7 +59,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
     // pick random points to use as centroids
     var goodClusters: usize = 0;
     while (goodClusters < K) {
-        const d = rand.intRangeAtMost(usize, 0, numVecs - 1);
+        const d = std.crypto.random.intRangeAtMost(usize, 0, numVecs - 1);
         var exists = false;
         for (centroids.items) |existing| {
             if (vecOps.equal(existing, vecData[d])) {
@@ -79,20 +78,21 @@ pub fn run(K: usize, file_name: []const u8) !void {
     var clusters = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..THREADS) |_| {
         var a = std.ArrayList(Vector).init(allocator);
-        try a.ensureTotalCapacity(150000);
+        try a.ensureTotalCapacity(numVecs / K);
         try clusters.append(a);
     }
 
     var cluster_sum = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..K) |_| {
         var a = std.ArrayList(Vector).init(allocator);
-        try a.ensureTotalCapacity(150000);
+        try a.ensureTotalCapacity(numVecs / K);
         try cluster_sum.append(a);
     }
 
     var total_iterations: usize = 0;
     t = std.time.milliTimestamp();
     var wg = std.Thread.WaitGroup{};
+
     while (true) {
         total_iterations += 1;
         var i: usize = 0;
@@ -102,7 +102,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
             const end = if (i + inc < numVecs) i + inc else numVecs;
 
             wg.start();
-            try thread_pool.spawn(calulateAndAssign, .{ &wg, vecData[i..end], centroids, &clusters.items[loop_num] });
+            try thread_pool.spawn(calculateAndAssign, .{ &wg, vecData[i..end], centroids, &clusters.items[loop_num] });
         }
 
         thread_pool.waitAndWork(&wg);
@@ -113,6 +113,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
                 try cluster_sum.items[v.cluster_id].append(v);
             }
         }
+
         var moved: bool = false;
         for (cluster_sum.items, centroids.items) |sum, *centroid| {
             const new_centroid = vecOps.meanV(sum);
@@ -122,6 +123,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
             }
             centroid.* = new_centroid;
         }
+
         if (!moved) {
             break;
         }
@@ -138,21 +140,12 @@ pub fn run(K: usize, file_name: []const u8) !void {
     std.debug.print("total iterations {d}\n", .{total_iterations});
     std.debug.print("kmeans time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
-const Point = struct { data: []const u8 };
 
-fn marshal(T: anytype) !void {
-    const out = std.io.getStdOut().writer();
-    try std.json.stringify(T, .{}, out);
-    _ = out.write("\n") catch |err| {
-        std.debug.print("{any}", .{err});
-    };
-}
-
-fn calulateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.ArrayList(VType), classifiedVecs: *std.ArrayList(Vector)) void {
+fn calculateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.ArrayList(VType), classifiedVecs: *std.ArrayList(Vector)) void {
     defer wg.finish();
 
     for (chunk) |vec| {
-        var bestCluster: usize = 0; // the index of the cluster we assign the vector to
+        var bestCluster: usize = 0;
         var minDist: f32 = std.math.inf(f32);
         var bestCentroid: VType = undefined;
         for (centroids.items, 0..) |centroid, i| {
@@ -181,8 +174,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn mag(v1: @Vector(N, T)) T {
-            // return std.math.sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
-            return Q_sqrt(@as(T, @reduce(.Add, v1 * v1)));
+            return std.math.sqrt(@as(T, @reduce(.Add, v1 * v1)));
         }
 
         pub fn cos_sim(v1: @Vector(N, T), v2: @Vector(N, T)) T {
@@ -213,6 +205,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
             return n / result;
         }
 
+        // TODO:(dean) this should be vectorized
         pub fn equal(v1: @Vector(N, T), v2: @Vector(N, T)) bool {
             for (0..N) |i| {
                 if (v1[i] != v2[i]) {
@@ -222,43 +215,4 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
             return true;
         }
     };
-}
-
-test "vec mean" {
-    const alloc = std.testing.allocator;
-    const asdf = VectorOps(2, f32);
-    var arr = std.ArrayList(@Vector(2, f32)).init(alloc);
-    defer arr.deinit();
-
-    try arr.append(@Vector(2, f32){ 1, 1 });
-    try arr.append(@Vector(2, f32){ 2, 2 });
-    const mean = asdf.mean(arr);
-    std.debug.print("mean: {d}\n", .{mean});
-}
-
-test "vec mean simd" {
-    // const alloc = std.testing.allocator;
-    // const asdf = VectorOps(2, f32);
-    // var arr = std.ArrayList(@Vector(2, f32)).init(alloc);
-    // defer arr.deinit();
-    const result: @Vector(2, f32) = @splat(2);
-
-    const v1 = @Vector(2, f32){ 1, 1 };
-    const v2 = @Vector(2, f32){ 2, 2 };
-    std.debug.print("add: {d}\n", .{(v1 + v2) / result});
-}
-const threehalfs: f32 = 1.5;
-pub fn Q_sqrt(number: f32) f32 {
-    var i: i32 = undefined;
-    var x2: f32 = undefined;
-    var y: f32 = undefined;
-
-    x2 = number * 0.5;
-    y = number;
-    i = @as(i32, @bitCast(y));
-    i = 0x5f3759df - (i >> 1);
-    y = @as(f32, @bitCast(i));
-    y = y * (threehalfs - (x2 * y * y));
-
-    return 1 / y;
 }
