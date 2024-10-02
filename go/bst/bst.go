@@ -15,12 +15,29 @@ func New() *BinarySearchtree {
 	return &BinarySearchtree{}
 }
 
-func (bst *BinarySearchtree) Insert(v int) {
+func (bst *BinarySearchtree) InsertRec(v int) {
+	bst.root = insert(bst.root, v)
+}
+
+func insert(n *Node, v int) *Node {
+	if n == nil {
+		return &Node{data: v}
+	}
+	if v > n.data {
+		n.right = insert(n.right, v)
+	} else if v < n.data {
+		n.left = insert(n.left, v)
+	}
+	return n
+}
+
+func (bst *BinarySearchtree) InsertIter(v int) {
 	// case for empty tree
 	if bst.root == nil {
 		bst.root = &Node{data: v}
 		return
 	}
+
 	current := bst.root
 	for {
 		if v > current.data {
@@ -31,6 +48,17 @@ func (bst *BinarySearchtree) Insert(v int) {
 			current = current.right
 			continue
 		}
+
+		if v < current.data {
+			if current.left == nil {
+				current.left = &Node{data: v}
+				return
+			}
+			current = current.left
+			continue
+		}
+		// case that v already exists in the tree
+		return
 	}
 }
 
@@ -41,4 +69,8 @@ func (bst *BinarySearchtree) InOrder(node *Node) {
 		fmt.Printf("%d ", node.data)
 		bst.InOrder(node.right)
 	}
+}
+
+func (bst *BinarySearchtree) del() {
+	 
 }
