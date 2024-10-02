@@ -10,10 +10,11 @@ const Server = struct {
             return;
         };
 
-        var base_server = addr.listen(.{}) catch |err| {
-            std.debug.print("{any}\n", .{err});
+        var base_server = addr.listen(.{ .kernel_backlog = 1024, .reuse_address = true }) catch |err| {
+            std.debug.print("error listen {any}\n", .{err});
             return;
         };
+
         defer base_server.deinit();
 
         var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -21,8 +22,6 @@ const Server = struct {
 
         const num_threads = 12; //try std.Thread.getCpuCount();
         const threads = try gpa.allocator().alloc(std.Thread, num_threads);
-
-        // try server.listen(self.address);
 
         for (0.., threads) |i, *t| {
             t.* = try std.Thread.spawn(.{}, handlerThread, .{ &base_server, i });
@@ -36,13 +35,12 @@ const Server = struct {
 
 fn handlerThread(base_server: *std.net.Server, i: usize) void {
     while (true) {
-        var buf: [500]u8 = undefined;
+        var buf: [1024]u8 = undefined;
         var conn = base_server.accept() catch |err| {
-            std.debug.print("{any}\n", .{err});
+            std.debug.print("error accept {any}\n", .{err});
             return;
         };
         _ = i;
-        // std.debug.print("handled on {d}\n", .{i});
         defer conn.stream.close();
         var server = std.http.Server.init(conn, &buf);
 
@@ -51,13 +49,10 @@ fn handlerThread(base_server: *std.net.Server, i: usize) void {
             return;
         };
 
-        // std.time.sleep(std.time.ns_per_s);
-        // std.debug.print("{any}\n", .{buf[0..req.head_end]});
         req.respond("hello", .{}) catch |err| {
             std.debug.print("{any}\n", .{err});
             return;
         };
-        // req.server.connection.stream.close();
     }
 }
 pub fn main() !void {
