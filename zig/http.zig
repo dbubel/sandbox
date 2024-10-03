@@ -1,4 +1,5 @@
 const std = @import("std");
+
 const Server = struct {
     port: u16,
     pub fn init(port: u16) Server {
@@ -26,7 +27,7 @@ const Server = struct {
         for (0.., threads) |i, *t| {
             t.* = try std.Thread.spawn(.{}, handlerThread, .{ &base_server, i });
         }
-
+        std.debug.print("starting...\n", .{});
         for (threads) |t| {
             t.join();
         }
@@ -40,7 +41,7 @@ fn handlerThread(base_server: *std.net.Server, i: usize) void {
             std.debug.print("error accept {any}\n", .{err});
             return;
         };
-        _ = i;
+        std.debug.print("thread {d}\n", .{i});
         defer conn.stream.close();
         var server = std.http.Server.init(conn, &buf);
 
@@ -48,11 +49,14 @@ fn handlerThread(base_server: *std.net.Server, i: usize) void {
             std.debug.print("{any}\n", .{err});
             return;
         };
+        std.debug.print("   Handling request for {s}\n", .{req.head.target});
+        const reader = req.reader() catch unreachable;
 
-        req.respond("hello", .{}) catch |err| {
-            std.debug.print("{any}\n", .{err});
-            return;
-        };
+        var read_buf: [1024]u8 = undefined;
+        const n = reader.readAll(&read_buf) catch unreachable;
+        std.debug.print("   bytes read {d} {s}\n", .{ n, read_buf[0..n] });
+
+        _ = req.respond("Hello http!\n", .{}) catch unreachable;
     }
 }
 pub fn main() !void {
