@@ -15,7 +15,7 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # Go workspace file
 go.work
@@ -25,7 +25,7 @@ go.work.sum
 .env
 vendor/
 zig-out/
-zig-cache/
+.zig-cache/
 .idea/
 *.o
 data/
