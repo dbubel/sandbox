@@ -5,6 +5,7 @@ const Server = struct {
     pub fn init(port: u16) Server {
         return Server{ .port = port };
     }
+
     pub fn run(s: Server) !void {
         const addr = std.net.Address.parseIp4("127.0.0.1", s.port) catch |err| {
             std.debug.print("{any}\n", .{err});
@@ -27,6 +28,7 @@ const Server = struct {
         for (0.., threads) |i, *t| {
             t.* = try std.Thread.spawn(.{}, handlerThread, .{ &base_server, i });
         }
+
         std.debug.print("starting...\n", .{});
         for (threads) |t| {
             t.join();
@@ -35,30 +37,39 @@ const Server = struct {
 };
 
 fn handlerThread(base_server: *std.net.Server, i: usize) void {
+    _ = i;
+    var header_buf: [1024]u8 = undefined;
     while (true) {
-        var buf: [1024]u8 = undefined;
         var conn = base_server.accept() catch |err| {
             std.debug.print("error accept {any}\n", .{err});
             return;
         };
-        std.debug.print("thread {d}\n", .{i});
         defer conn.stream.close();
-        var server = std.http.Server.init(conn, &buf);
 
+        var server = std.http.Server.init(conn, &header_buf);
         var req = server.receiveHead() catch |err| {
             std.debug.print("{any}\n", .{err});
             return;
         };
-        std.debug.print("   Handling request for {s}\n", .{req.head.target});
         const reader = req.reader() catch unreachable;
+        const n = reader.readAll(&header_buf) catch unreachable;
 
-        var read_buf: [1024]u8 = undefined;
-        const n = reader.readAll(&read_buf) catch unreachable;
-        std.debug.print("   bytes read {d} {s}\n", .{ n, read_buf[0..n] });
+        _ = n;
+        // _ = conn.stream.writeAll("hello fuck you") catch unreachable;
+        var aids = req.respondStreaming(.{ .send_buffer = &header_buf });
+        // _ = aids;
 
-        _ = req.respond("Hello http!\n", .{}) catch unreachable;
+        _ = std.json.stringify(.{ .fuck = "fuck" }, .{}, aids.writer()) catch unreachable;
+        _ = aids.flush() catch unreachable;
+        _ = aids.end() catch unreachable;
+        //
+        // _ = req.respond("Hello http!\n", .{ .status = .ok }) catch unreachable;
+
+        // std.debug.print("   Handling request for {s}\n", .{req.head.target});
+        // std.debug.print("   bytes read {d} {s}\n", .{ n, header_buf[0..n] });
     }
 }
+
 pub fn main() !void {
     const server = Server.init(8080);
     try server.run();
