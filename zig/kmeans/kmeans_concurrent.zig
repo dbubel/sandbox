@@ -208,7 +208,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn mag(v1: @Vector(N, T)) T {
-            return std.math.sqrt(@as(T, @reduce(.Add, v1 * v1)));
+            return @sqrt(@as(T, @reduce(.Add, v1 * v1)));
         }
 
         pub fn cos_sim(v1: @Vector(N, T), v2: @Vector(N, T)) T {
