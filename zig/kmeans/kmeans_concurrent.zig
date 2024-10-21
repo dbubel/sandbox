@@ -1,13 +1,11 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 512; // dimension of the vectors we are working with
+const DIMS = 2; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
 const EPSILON: f32 = 0.01;
 const THREADS = 12;
-
 const vecOps = VectorOps(DIMS, f32);
-const VType = @Vector(DIMS, f32);
 
 const Vector = struct {
     vec: VType,
@@ -42,8 +40,15 @@ pub fn run(K: usize, file_name: []const u8) !void {
         defer writer.reset();
         // read the file line by line writing into buf
         reader.streamUntilDelimiter(writer.writer(), '\n', null) catch |err| {
-            std.debug.print("error: {any}\n", .{err});
-            break;
+            switch (err) {
+                error.EndOfStream => {
+                    break;
+                },
+                else => {
+                    std.debug.print("{any}", .{err});
+                    break;
+                },
+            }
         };
 
         // parse the json array as a fixed size f32 array
@@ -62,7 +67,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
     // pick random points to use as centroids
     var goodClusters: usize = 0;
     while (goodClusters < K) {
-        const d = std.crypto.random.intRangeAtMost(usize, 0, numVecs - 1);
+        const d = rand.intRangeAtMost(usize, 0, numVecs - 1);
         var exists = false;
         for (centroids.items) |existing| {
             if (vecOps.equal(existing, vecData[d])) {
@@ -80,22 +85,19 @@ pub fn run(K: usize, file_name: []const u8) !void {
     const inc: usize = (numVecs + cpuCount) / cpuCount;
     var clusters = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..THREADS) |_| {
-        var a = std.ArrayList(Vector).init(allocator);
-        try a.ensureTotalCapacity(numVecs / K);
+        const a = std.ArrayList(Vector).init(allocator);
         try clusters.append(a);
     }
 
     var cluster_sum = std.ArrayList(std.ArrayList(Vector)).init(allocator);
     for (0..K) |_| {
-        var a = std.ArrayList(Vector).init(allocator);
-        try a.ensureTotalCapacity(numVecs / K);
+        const a = std.ArrayList(Vector).init(allocator);
         try cluster_sum.append(a);
     }
 
     var total_iterations: usize = 0;
     t = std.time.milliTimestamp();
     var wg = std.Thread.WaitGroup{};
-
     while (true) {
         total_iterations += 1;
         var i: usize = 0;
@@ -105,7 +107,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
             const end = if (i + inc < numVecs) i + inc else numVecs;
 
             wg.start();
-            try thread_pool.spawn(calculateAndAssign, .{ &wg, vecData[i..end], centroids, &clusters.items[loop_num] });
+            try thread_pool.spawn(calulateAndAssign, .{ &wg, vecData[i..end], centroids, &clusters.items[loop_num] });
         }
 
         thread_pool.waitAndWork(&wg);
@@ -116,29 +118,33 @@ pub fn run(K: usize, file_name: []const u8) !void {
                 try cluster_sum.items[v.cluster_id].append(v);
             }
         }
-        // var moved: bool = false;
-        // for (cluster_sum.items, centroids.items) |sum, *centroid| {
-        //     const new_centroid = vecOps.meanV(sum);
-        //     const dist = vecOps.dist(centroid.*, new_centroid);
-        //     if (dist > EPSILON) {
-        //         moved = true;
-        //     }
-        //     centroid.* = new_centroid;
-        // }
+
         var moved: bool = false;
-        updateCentroids(&moved, centroids, cluster_sum);
+        for (cluster_sum.items, centroids.items) |sum, *centroid| {
+            const new_centroid = vecOps.meanV(sum);
+            const dist = vecOps.dist(centroid.*, new_centroid);
+            if (dist > EPSILON) {
+                moved = true;
+            }
+            centroid.* = new_centroid;
+        }
+
         if (!moved) {
             break;
         }
 
         for (clusters.items) |*c| {
-            // c.clearRetainingCapacity();
-            c.resize(0) catch unreachable;
+            c.clearRetainingCapacity();
         }
 
         for (cluster_sum.items) |*c| {
-            c.resize(0) catch unreachable;
-            // c.clearRetainingCapacity();
+            c.clearRetainingCapacity();
+        }
+    }
+    for (clusters.items) |item| {
+        std.debug.print("\n", .{});
+        for (item.items) |a| {
+            std.debug.print("{any}\n", .{a});
         }
     }
 
@@ -146,42 +152,22 @@ pub fn run(K: usize, file_name: []const u8) !void {
     std.debug.print("kmeans time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
 
-fn updateCentroids(moved: *bool, centroids: []VType, cluster_sum: std.ArrayList(std.ArrayList(Vector))) void {
-    var wg = std.Thread.WaitGroup{};
-
-    for (cluster_sum.items, 0..) |cluster, i| {
-        wg.start();
-        std.Thread.spawn(.{}, calcCentroidAndUpdate, .{ &wg, centroids, cluster, i, moved });
-    }
-
-    std.Thread.wait(&wg);
-}
-
-fn calcCentroidAndUpdate(wg: *std.Thread.WaitGroup, centroids: []VType, cluster: std.ArrayList(Vector), i: usize, moved: *bool) void {
-    defer wg.finish();
-
-    const new_centroid = vecOps.meanV(cluster);
-    const dist = vecOps.dist(centroids[i], new_centroid);
-    if (dist > EPSILON) {
-        moved.* = true;
-    }
-    centroids[i] = new_centroid;
-}
-fn marshal(T: anytype) !void {
-    const out = std.io.getStdOut().writer();
-    try std.json.stringify(T, .{}, out);
-    _ = out.write("\n") catch |err| {
-        std.debug.print("{any}", .{err});
-    };
-}
+// fn marshal(T: anytype) !void {
+//     const out = std.io.getStdOut().writer();
+//     try std.json.stringify(T, .{}, out);
+//     _ = out.write("\n") catch |err| {
+//         std.debug.print("{any}", .{err});
+//     };
+// }
 
 fn calulateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.ArrayList(VType), classifiedVecs: *std.ArrayList(Vector)) void {
     defer wg.finish();
 
     for (chunk) |vec| {
-        var bestCluster: usize = 0;
+        var bestCluster: usize = 0; // the index of the cluster we assign the vector to
         var minDist: f32 = std.math.inf(f32);
         var bestCentroid: VType = undefined;
+
         for (centroids.items, 0..) |centroid, i| {
             const dist: f32 = vecOps.distSquared(vec, centroid);
             if (dist < minDist) {
@@ -208,7 +194,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn mag(v1: @Vector(N, T)) T {
-            return @sqrt(@as(T, @reduce(.Add, v1 * v1)));
+            return @sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
         }
 
         pub fn cos_sim(v1: @Vector(N, T), v2: @Vector(N, T)) T {
@@ -239,7 +225,6 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
             return n / result;
         }
 
-        // TODO:(dean) this should be vectorized
         pub fn equal(v1: @Vector(N, T), v2: @Vector(N, T)) bool {
             for (0..N) |i| {
                 if (v1[i] != v2[i]) {
