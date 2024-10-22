@@ -26,6 +26,7 @@ go.work.sum
 vendor/
 zig-out/
 .zig-cache/
+.zig-cache
 .idea/
 *.o
 data/
