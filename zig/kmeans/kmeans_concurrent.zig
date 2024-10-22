@@ -24,7 +24,8 @@ pub fn run(K: usize, file_name: []const u8) !void {
     var centroids = std.ArrayList(@Vector(DIMS, f32)).init(allocator);
     defer centroids.deinit();
 
-    var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 1100000);
+    // allocate more than the number of lines you have in the file
+    var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 100_000_000);
 
     // ----------------------------------------------------------------- File read start
     var buf: [1024 * 256]u8 = undefined;
@@ -141,6 +142,7 @@ pub fn run(K: usize, file_name: []const u8) !void {
             c.clearRetainingCapacity();
         }
     }
+
     for (clusters.items) |item| {
         std.debug.print("\n", .{});
         for (item.items) |a| {
@@ -151,14 +153,6 @@ pub fn run(K: usize, file_name: []const u8) !void {
     std.debug.print("total iterations {d}\n", .{total_iterations});
     std.debug.print("kmeans time: {d}ms\n", .{std.time.milliTimestamp() - t});
 }
-
-// fn marshal(T: anytype) !void {
-//     const out = std.io.getStdOut().writer();
-//     try std.json.stringify(T, .{}, out);
-//     _ = out.write("\n") catch |err| {
-//         std.debug.print("{any}", .{err});
-//     };
-// }
 
 fn calulateAndAssign(wg: *std.Thread.WaitGroup, chunk: []VType, centroids: std.ArrayList(VType), classifiedVecs: *std.ArrayList(Vector)) void {
     defer wg.finish();
