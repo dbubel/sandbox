@@ -59,7 +59,7 @@ fn handlerThread(base_server: *std.net.Server, i: usize) void {
         var aids = req.respondStreaming(.{ .send_buffer = &header_buf });
         // _ = aids;
 
-        _ = std.json.stringify(.{ .fuck = "fuck" }, .{}, aids.writer()) catch unreachable;
+        _ = std.json.stringify(.{ .fuck = "fuck" }, .{ .whitespace = .minified }, aids.writer()) catch unreachable;
         _ = aids.flush() catch unreachable;
         _ = aids.end() catch unreachable;
         //
