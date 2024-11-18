@@ -67,6 +67,13 @@ fn handlerFn(base_server: *std.net.Server, alloc: std.mem.Allocator) void {
             std.debug.print("\t{s}:{s}\n", .{ header.name, header.value });
         }
 
+<<<<<<< HEAD
+        _ = std.json.stringify(.{ .fuck = "fuck" }, .{ .whitespace = .minified }, aids.writer()) catch unreachable;
+        _ = aids.flush() catch unreachable;
+        _ = aids.end() catch unreachable;
+        //
+        // _ = req.respond("Hello http!\n", .{ .status = .ok }) catch unreachable;
+=======
         // example of reading the request body. create a reader and then
         // use the readAll function to read the request body into request_buf
         const reader = req.reader() catch |err| {
@@ -78,6 +85,7 @@ fn handlerFn(base_server: *std.net.Server, alloc: std.mem.Allocator) void {
             std.debug.print("error reading request {any}\n", .{err});
             return;
         };
+>>>>>>> 2f052a9730e1282668124d3b742a90c8c81dfb1d
 
         std.debug.print("request body len {d}\n", .{n});
         std.debug.print("request body {s}\n", .{request_buf[0..n]});

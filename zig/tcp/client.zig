@@ -11,15 +11,14 @@ pub fn main() !void {
     defer posix.close(socket);
 
     try posix.connect(socket, &address.any, address.getOsSockLen());
-    for (0..10) |_| {
-        try writeMessage(socket, "Hello World");
-        try writeMessage(socket, "It's Over 9000!!");
-    }
+    try writeMessage(socket, "Hello World");
+    try writeMessage(socket, "It's Over 9000!!");
 }
 
 fn writeMessage(socket: posix.socket_t, msg: []const u8) !void {
     var buf: [4]u8 = undefined;
     std.mem.writeInt(u32, &buf, @intCast(msg.len), .little);
+
     var vec = [2]posix.iovec_const{
         .{ .len = 4, .base = &buf },
         .{ .len = msg.len, .base = msg.ptr },

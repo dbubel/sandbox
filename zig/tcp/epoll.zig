@@ -13,7 +13,7 @@ pub fn main() !void {
     var server = try Server.init(allocator, 4096);
     defer server.deinit();
 
-    const address = try std.net.Address.parseIp("0.0.0.0", 5882);
+    const address = try std.net.Address.parseIp("127.0.0.1", 5882);
     try server.run(address);
     std.debug.print("STOPPED\n", .{});
 }
@@ -75,7 +75,6 @@ const Server = struct {
         defer posix.close(listener);
 
         try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)));
-        try posix.setsockopt(listener, posix.SOL.SOCKET, posix.SO.REUSEPORT_LB, &std.mem.toBytes(@as(c_int, 1)));
         try posix.bind(listener, &address.any, address.getOsSockLen());
         try posix.listen(listener, 128);
         var read_timeout_list = &self.read_timeout_list;
@@ -99,6 +98,7 @@ const Server = struct {
                                     self.closeClient(client);
                                     break;
                                 } orelse break; // no more messages
+
                                 client.read_timeout = std.time.milliTimestamp() + READ_TIMEOUT_MS;
                                 read_timeout_list.remove(client.read_timeout_node);
                                 read_timeout_list.append(client.read_timeout_node);
@@ -150,7 +150,6 @@ const Server = struct {
         for (0..space) |_| {
             var address: net.Address = undefined;
             var address_len: posix.socklen_t = @sizeOf(net.Address);
-            std.debug.print("listening...\n", .{});
             const socket = posix.accept(listener, &address.any, &address_len, posix.SOCK.NONBLOCK) catch |err| switch (err) {
                 error.WouldBlock => return,
                 else => return err,
@@ -321,8 +320,8 @@ const Reader = struct {
         var buf = self.buf;
 
         while (true) {
-            std.debug.print("reading\n", .{});
             if (try self.bufferedMessage()) |msg| {
+                std.debug.print("{s}\n", .{msg});
                 return msg;
             }
             const pos = self.pos;

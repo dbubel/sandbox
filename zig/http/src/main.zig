@@ -2,15 +2,15 @@
 //! you are building an executable. If you are making a library, the convention
 //! is to delete this file and start with root.zig instead.
 const std = @import("std");
-const lob = @import("logz");
+const log = @import("logz");
 
 pub fn main() !void {
     // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
     // initialize a logging pool
 
-    const gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 
-    try lob.setup(gpa.allocator(), .{
+    try log.setup(gpa.allocator(), .{
         .level = .Info,
         .pool_size = 100,
         .buffer_size = 4096,
@@ -19,9 +19,9 @@ pub fn main() !void {
         .output = .stdout,
         .encoding = .logfmt,
     });
-    defer lob.deinit();
+    defer log.deinit();
 
-    lob.info().string("path", "hello").int("ms", 1).log();
+    log.info().string("path", "hello").int("ms", 1).log();
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
 
     // stdout is for the actual output of your application, for example if you
