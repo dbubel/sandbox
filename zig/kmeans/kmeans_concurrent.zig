@@ -1,10 +1,10 @@
 const std = @import("std");
 const rand = std.crypto.random;
-const DIMS = 2; // dimension of the vectors we are working with
+const DIMS = 512; // dimension of the vectors we are working with
 const VType = @Vector(DIMS, f32);
 
 const EPSILON: f32 = 0.01;
-const THREADS = 12;
+const THREADS = 64;
 const vecOps = VectorOps(DIMS, f32);
 
 const Vector = struct {
@@ -14,7 +14,8 @@ const Vector = struct {
 };
 
 pub fn run(K: usize, file_name: []const u8) !void {
-    const cpuCount = try std.Thread.getCpuCount();
+    // const cpuCount = try std.Thread.getCpuCount();
+    const cpuCount = 64;
     const allocator = std.heap.c_allocator;
 
     var thread_pool: std.Thread.Pool = undefined;
@@ -24,7 +25,8 @@ pub fn run(K: usize, file_name: []const u8) !void {
     var centroids = std.ArrayList(@Vector(DIMS, f32)).init(allocator);
     defer centroids.deinit();
 
-    var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 1100000);
+    // allocate memory for the vectors from the file
+    var vecData: []VType = try allocator.alloc(@Vector(DIMS, f32), 1000000);
 
     // ----------------------------------------------------------------- File read start
     var buf: [1024 * 256]u8 = undefined;
@@ -141,12 +143,12 @@ pub fn run(K: usize, file_name: []const u8) !void {
             c.clearRetainingCapacity();
         }
     }
-    for (clusters.items) |item| {
-        std.debug.print("\n", .{});
-        for (item.items) |a| {
-            std.debug.print("{any}\n", .{a});
-        }
-    }
+    // for (clusters.items) |item| {
+    //     std.debug.print("\n", .{});
+    //     for (item.items) |a| {
+    //         std.debug.print("{d}\n", .{a.vec});
+    //     }
+    // }
 
     std.debug.print("total iterations {d}\n", .{total_iterations});
     std.debug.print("kmeans time: {d}ms\n", .{std.time.milliTimestamp() - t});
