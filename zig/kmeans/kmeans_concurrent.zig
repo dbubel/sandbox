@@ -184,11 +184,11 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn dist(v1: @Vector(N, T), v2: @Vector(N, T)) T {
-            return mag(v2 - v1);
+            return @sqrt(distSquared(v1, v2));
         }
 
         pub fn mag(v1: @Vector(N, T)) T {
-            return @sqrt(@as(T, @floatCast(@reduce(.Add, v1 * v1))));
+            return @sqrt(dot(v1, v1));
         }
 
         pub fn cos_sim(v1: @Vector(N, T), v2: @Vector(N, T)) T {
@@ -196,7 +196,7 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn mean(group: std.ArrayList(@Vector(N, T))) @Vector(N, T) {
-            var n: @Vector(N, T) = undefined;
+            var n: @Vector(N, T) = @splat(0);
             for (group.items) |point| {
                 n += point;
             }
@@ -206,11 +206,12 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn distSquared(v1: @Vector(N, T), v2: @Vector(N, T)) T {
-            return @as(T, @reduce(.Add, (v2 - v1) * (v2 - v1)));
+            const diff = v2 - v1;
+            return dot(diff, diff);
         }
 
         pub fn meanV(group: std.ArrayList(Vector)) @Vector(N, T) {
-            var n: @Vector(N, T) = undefined;
+            var n: @Vector(N, T) = @splat(0);
             for (group.items) |point| {
                 n += point.vec;
             }
@@ -220,12 +221,8 @@ pub fn VectorOps(comptime N: comptime_int, comptime T: type) type {
         }
 
         pub fn equal(v1: @Vector(N, T), v2: @Vector(N, T)) bool {
-            for (0..N) |i| {
-                if (v1[i] != v2[i]) {
-                    return false;
-                }
-            }
-            return true;
+            const eq_mask = v1 == v2;
+            return @reduce(.And, eq_mask);
         }
     };
 }

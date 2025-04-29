@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package distributed;
+
+option go_package = "github.com/yourusername/distributed";
+
+// Service definition for the distributed system
+service DistributedSystem {
+  // Register a slave with the master
+  rpc RegisterSlave(RegisterRequest) returns (RegisterResponse) {}
+  
+  // Heartbeat to check if slave is alive
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {}
+  
+  // Assign a task to a slave
+  rpc AssignTask(TaskRequest) returns (TaskResponse) {}
+  
+  // Report task completion back to master
+  rpc CompleteTask(TaskResult) returns (TaskAck) {}
+}
+
+// Request to register a slave with the master
+message RegisterRequest {
+  int32 slave_id = 1;
+  string address = 2;
+  int32 port = 3;
+}
+
+// Response from master after registration
+message RegisterResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Heartbeat request from master to slave
+message HeartbeatRequest {
+  int64 timestamp = 1;
+}
+
+// Heartbeat response from slave to master
+message HeartbeatResponse {
+  int32 slave_id = 1;
+  string status = 2;
+  double load = 3;
+}
+
+// Task assignment from master to slave
+message TaskRequest {
+  string task_id = 1;
+  string task_type = 2;
+  bytes payload = 3;
+  int64 deadline = 4;
+}
+
+// Task assignment response from slave
+message TaskResponse {
+  string task_id = 1;
+  bool accepted = 2;
+  string message = 3;
+}
+
+// Task completion report from slave to master
+message TaskResult {
+  string task_id = 1;
+  bool success = 2;
+  bytes result = 3;
+  string error_message = 4;
+  int64 completion_time = 5;
+}
+
+// Acknowledgment from master for a completed task
+message TaskAck {
+  string task_id = 1;
+  bool received = 2;
+} 
